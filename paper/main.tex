@@ -46,10 +46,37 @@ low error, just as it does on real footage of the same scene. Our contributions:
 \end{itemize}
 
 \section{Related Work}
-\todo{Video world models for robotics (e.g., UniSim, Cosmos, DreamGen-style pipelines); video
-generation evaluation (FVD, VBench and physics-oriented benchmarks); geometric and 3D-consistency
-evaluation of generated video (e.g., MEt3R-style multi-view consistency, SfM-on-generated-video
-studies); feed-forward reconstruction (DUSt3R, MASt3R, VGGT). Verify every citation before use.}
+\paragraph{Geometric consistency of generated video.} Running classical geometry on generated video
+is not new. Li et al.~\cite{li2024sora} used SIFT matching, RANSAC fundamental-matrix fitting,
+epipolar error and COLMAP to compare a handful of Sora, Gen-2 and Pika clips. Reconstruction-based
+metrics such as MEt3R~\cite{asim2025met3r} and WorldScore~\cite{duan2025worldscore}, and benchmarks
+such as GeoT2V-Bench~\cite{fan2026geot2v}, score multi-view or 3D consistency of generated content
+with feed-forward reconstructors~\cite{wang2024dust3r,leroy2024mast3r,wang2025vggt}.
+Camera-controllable generators~\cite{he2024cameractrl,wang2024motionctrl,xu2024camco,bahmani2025ac3d}
+report camera-pose error and COLMAP-based success rates. Broader benchmarks probe visual quality
+and physical plausibility~\cite{huang2024vbench,zheng2025vbench2,li2025worldmodelbench,meng2024phygenbench,motamed2025physicsiq,bansal2025videophy}.
+These works do not calibrate their metrics. In particular, a frozen or blurry video can look
+consistent under match-count metrics (no motion, few but clean matches), a failure our controls
+expose directly.
+
+\paragraph{Video world models for robots.} Generative video models have been proposed as robot
+simulators and planners~\cite{yang2024unisim,du2023unipi,du2024vlp,ko2024avdc,zhu2025irasim,nvidia2025cosmos,liao2025genieenvisioner,jang2025dreamgen}.
+Action-conditioned models trained on real robot data, notably Ctrl-World~\cite{guo2026ctrlworld}
+trained on DROID~\cite{khazatsky2024droid}, aim to support policy evaluation inside the model.
+Recent work adds explicit 3D structure to robot world models~\cite{bardhan2026depthworld,liu2026geometry4d}.
+Evaluations of robot world models mostly measure policy-ranking agreement or visual
+fidelity~\cite{quevedo2025worldgym,li2025worldeval,yue2025ewmbench,zhang2026worldinworld}.
+Closest to us, RoboPhys-3D~\cite{wang2026robophys3d} reconstructs generated and ground-truth robot
+videos with VGGT, COLMAP and SLAM, but in simulation (RoboTwin) and without perturbed real
+references.
+
+\paragraph{Our position.} We do not claim to be first to apply SfM to generated video. Our
+contribution is a \emph{calibrated} audit on \emph{real} robot data: (i)~a ladder of perturbed real
+continuations (non-rigid warps, motion-matched slow-downs, sharpness-matched blur, unrelated frames)
+that shows what each metric responds to; (ii)~real DROID wrist-camera clips, where the camera moves
+with the arm; and (iii)~a direct comparison between general image-to-video models and an
+action-conditioned DROID world model, including the error of the predicted camera path against the
+true one.
 
 \section{Method}
 \paragraph{Conditioning clips.} We sample clips from the DROID-100 release \todo{cite DROID}. The
@@ -143,5 +170,8 @@ A single dataset and camera (DROID wrist view at 320$\times$180). A small set of
 fit a 16\,GB GPU. Image- and text-conditioned generation without action conditioning. Scene motion
 (the arm, manipulated objects) that violates rigidity even in real clips; the real-clip baseline
 absorbs this, but does not remove it.
+
+\bibliographystyle{plain}
+\bibliography{refs}
 
 \end{document}
