@@ -4,7 +4,7 @@ $ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
 $py = ".\.venv\Scripts\python.exe"
 $log = "work\score_chain.log"
-while (Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'run\.py generate' }) { Start-Sleep 30 }
+while (Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'run\.py (generate|score)' }) { Start-Sleep 30 }
 foreach ($step in @(@("--no-vggt"), @("--fps5"), @())) {
     "$(Get-Date -Format s) start score $($step -join ' ')" | Out-File -Append -Encoding utf8 $log
     & $py run.py score @step 2>&1 | Where-Object { $_ -match 'Traceback|Error' } | Out-File -Append -Encoding utf8 $log
