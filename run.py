@@ -96,22 +96,43 @@ def cmd_generate(a):
         print(f"{c.name}: {time.time() - t:.0f}s, {len(frames)} frames", flush=True)
 
 
-def _score_one(clip_dir, mask_png, horizon_s, prev, use_vggt):
-    """Fills in whatever `prev` lacks, so a later run with VGGT only adds the VGGT part."""
+def _real_centers(clip_name, horizon_s, tmp_frames):
+    """VGGT camera centers of the real continuation, cached per clip and horizon."""
+    from wmgeo import vggt_eval
+    cache = REAL / clip_name / f"vggt_centers_h{horizon_s}.npy"
+    if not cache.exists():
+        _, p = vggt_eval.clip_stats(tmp_frames)
+        np.save(cache, vggt_eval.centers(p["extrinsic"]))
+    return np.load(cache)
+
+
+def _score_one(clip_dir, mask_png, horizon_s, prev, use_vggt, step=1):
+    """Fills in whatever `prev` lacks, so a later run with VGGT only adds the VGGT part.
+    step=3 scores the 5 fps track (every 3rd frame), where no condition has repeated frames."""
     import shutil
     from wmgeo import colmap_eval, epipolar, vggt_eval
     n = int(horizon_s * io.EVAL_FPS) + 1
-    frames = io.read_clip(clip_dir)[:n]
-    tmp = clip_dir.parent / f"_h{horizon_s}_{clip_dir.name}"  # prefix copy for SfM/VGGT
+    frames = io.read_clip(clip_dir)[:n][::step]
+    gaps = epipolar.GAPS if step == 1 else (1, 2, 4)  # 5 fps gaps = 0.2 / 0.4 / 0.8 s
+    tmp = clip_dir.parent / f"_h{horizon_s}_s{step}_{clip_dir.name}"  # prefix copy for SfM/VGGT
     io.write_clip(frames, tmp)
     r = dict(prev)
     try:
         if "reg_rate" not in r:
             r.update(colmap_eval.run(tmp, mask_png))
             r.pop("centers")
-            r["epipolar"] = epipolar.clip_stats(frames, cv2.imread(str(mask_png), 0))
+            r["epipolar"] = epipolar.clip_stats(frames, cv2.imread(str(mask_png), 0), gaps=gaps)
         if use_vggt and "vggt" not in r:
-            r["vggt"], _ = vggt_eval.clip_stats(tmp)
+            r["vggt"], p = vggt_eval.clip_stats(tmp)
+            if clip_dir.parent.name.startswith("gen_"):
+                real_tmp = REAL.parent / f"_h{horizon_s}_real_{clip_dir.name}"
+                io.write_clip(io.read_clip(REAL / clip_dir.name)[:n], real_tmp)
+                try:
+                    ref = _real_centers(clip_dir.name, horizon_s, real_tmp)
+                finally:
+                    shutil.rmtree(real_tmp, ignore_errors=True)
+                # only meaningful for action-conditioned models, which are given the real actions
+                r["vggt"]["ate_vs_real"] = vggt_eval.ate_sim3(vggt_eval.centers(p["extrinsic"]), ref)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return r
@@ -119,19 +140,21 @@ def _score_one(clip_dir, mask_png, horizon_s, prev, use_vggt):
 
 def cmd_score(a):
     mask_png = ROOT / "data/droid_gripper_mask.png"
+    step, fname = (3, "scores5.json") if a.fps5 else (1, "scores.json")
+    use_vggt = not (a.no_vggt or a.fps5)  # VGGT already subsamples to 5 fps internally
     conds = [d for d in sorted(WORK.iterdir()) if d.is_dir() and (d.name in a.only if a.only else True)
              and (d.name == "real" or d.name.startswith(("ctrl_", "gen_")))]
     for cond in conds:
         for clip_dir in sorted(cond.iterdir())[: a.limit or None]:
             if not (clip_dir / "frames").exists():
                 continue
-            out = clip_dir / "scores.json"
+            out = clip_dir / fname
             scores = json.loads(out.read_text()) if out.exists() else {}
             for h in HORIZONS_S:
                 prev = scores.get(str(h), {})
-                if "reg_rate" in prev and (a.no_vggt or "vggt" in prev):
+                if "reg_rate" in prev and (not use_vggt or "vggt" in prev):
                     continue
-                scores[str(h)] = _score_one(clip_dir, mask_png, h, prev, not a.no_vggt)
+                scores[str(h)] = _score_one(clip_dir, mask_png, h, prev, use_vggt, step)
                 out.write_text(json.dumps(scores, indent=1, default=float))
             print(f"{cond.name}/{clip_dir.name} scored", flush=True)
 
@@ -196,6 +219,7 @@ if __name__ == "__main__":
     g.add_argument("--no-offload", action="store_true")
     sc = sub.add_parser("score"); sc.add_argument("--only", nargs="*"); sc.add_argument("--no-vggt", action="store_true")
     sc.add_argument("--limit", type=int, default=0)
+    sc.add_argument("--fps5", action="store_true", help="score every 3rd frame into scores5.json")
     sub.add_parser("report")
     a = p.parse_args()
     globals()[f"cmd_{a.cmd}"](a)
