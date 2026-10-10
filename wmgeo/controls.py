@@ -6,6 +6,8 @@
 - mix:   frames drawn from unrelated clips (geometry-free lower bound)
 - slow:  the real continuation slowed by a factor (nearest-frame repeats), matching the reduced
          camera motion of generated clips, so low motion alone can be told apart from bad geometry
+- blur:  the real continuation Gaussian-blurred to the sharpness of soft generators (Ctrl-World,
+         LTX), so lost detail (fewer features) can be told apart from inconsistent geometry
 """
 import cv2
 import numpy as np
@@ -51,3 +53,7 @@ def slow(frames, factor):
     n = len(frames)
     idx = np.minimum((np.arange(n) / factor).round().astype(int), n - 1)
     return reencode([frames[i] for i in idx])
+
+
+def blur(frames, sigma):
+    return reencode([cv2.GaussianBlur(f, (0, 0), sigma) for f in frames])

@@ -23,6 +23,7 @@ REAL = WORK / "real"
 HORIZONS_S = (1, 2, 3, 5)  # scored as prefixes of each continuation
 VGGT_HORIZONS_S = (2, 5)   # VGGT is the slow scorer (~4 s per clip-horizon), so only two horizons
 WARP_AMPS = (1, 2, 4, 8)   # px at EVAL resolution
+BLUR_SIGMAS = (0.7,)       # matches Ctrl-World / LTX sharpness (Laplacian variance ~125 vs 416 real)
 SLOW_FACTORS = (2.5, 12)   # motion-matched to LTX (~7.4 px / 4 frames) and CogVideoX (~1.5 px)
 
 
@@ -47,6 +48,8 @@ def cmd_controls(a):
             conds[f"ctrl_warp{amp}"] = controls.warp(frames, amp, seed=seed)
         for k in SLOW_FACTORS:
             conds[f"ctrl_slow{k:g}"] = controls.slow(frames, k)
+        for sg in BLUR_SIGMAS:
+            conds[f"ctrl_blur{sg:g}"] = controls.blur(frames, sg)
         for name, fr in conds.items():
             out = WORK / name / c.name
             if not (out / "meta.json").exists():
