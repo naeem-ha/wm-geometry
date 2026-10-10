@@ -16,3 +16,8 @@ paper/*.log
 paper/*.out
 paper/*.pdf
 paper/*.synctex.gz
+paper/*.bbl
+paper/*.blg
+paper/bib.log
+paper/build.log
+paper/template/
