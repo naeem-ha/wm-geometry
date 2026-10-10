@@ -78,3 +78,25 @@ def clip_stats(clip_dir, gaps=(3, 6, 12)):
     centers = np.stack([-e[:, :3].T @ e[:, 3] for e in p["extrinsic"]])
     out["path_length"] = float(np.linalg.norm(np.diff(centers, axis=0), axis=1).sum())
     return out, p
+
+
+def centers(extrinsic):
+    return np.stack([-e[:, :3].T @ e[:, 3] for e in extrinsic])
+
+
+def ate_sim3(est, ref):
+    """Trajectory error of est vs ref camera centers (N,3) after a Umeyama Sim(3) fit,
+    as RMSE divided by ref path length (scale-free; both come from VGGT's arbitrary frame)."""
+    mu_e, mu_r = est.mean(0), ref.mean(0)
+    E, Rf = est - mu_e, ref - mu_r
+    U, D, Vt = np.linalg.svd(Rf.T @ E / len(est))
+    S = np.eye(3)
+    if np.linalg.det(U) * np.linalg.det(Vt) < 0:
+        S[2, 2] = -1
+    R = U @ S @ Vt
+    var_e = (E ** 2).sum() / len(est)
+    scale = np.trace(np.diag(D) @ S) / max(var_e, 1e-12)
+    aligned = scale * (R @ E.T).T + mu_r
+    rmse = np.sqrt(((aligned - ref) ** 2).sum(1).mean())
+    path = np.linalg.norm(np.diff(ref, axis=0), axis=1).sum()
+    return float(rmse / max(path, 1e-9))
