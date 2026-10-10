@@ -6,11 +6,15 @@ from pathlib import Path
 import pandas as pd
 
 WORK = Path(__file__).resolve().parent / "work"
-conds = sys.argv[1:] or ["ctrl_real", "ctrl_warp2", "ctrl_warp8", "ctrl_mix", "gen_ltx"]
+args = sys.argv[1:]
+FPS5 = "--fps5" in args  # every 3rd frame; epipolar gap 2 there = gap 6 at 15 fps (0.4 s)
+args = [a for a in args if a != "--fps5"]
+conds = args or ["ctrl_real", "ctrl_warp2", "ctrl_warp8", "ctrl_mix", "gen_ltx"]
+FILE, GAP = ("scores5.json", "2") if FPS5 else ("scores.json", "4")
 rows = []
-for f in WORK.glob("*/*/scores.json"):
+for f in WORK.glob(f"*/*/{FILE}"):
     for h, s in json.loads(f.read_text()).items():
-        e = s["epipolar"]["4"]
+        e = s["epipolar"][GAP]
         v = s.get("vggt", {}).get("6", {})
         rows.append(dict(cond=f.parent.parent.name, clip=f.parent.name, h=int(h), reg=s["reg_rate"],
                          reproj=s["reproj_err"], track=s["track_len"], inliers=e["n_inliers"],
