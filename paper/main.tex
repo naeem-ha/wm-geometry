@@ -14,50 +14,63 @@
 
 \begin{abstract}
 Video generative models are increasingly proposed as robot world models: a policy imagines the
-future in pixels and plans against it. Planning, however, needs the imagined future to be
-geometrically actionable---a single rigid scene seen from a moving camera---not just visually
-plausible. We audit this property directly. Starting from real robot wrist-camera frames, we let
-open image-to-video models predict the next five seconds and ask whether structure-from-motion
-(COLMAP), two-view epipolar geometry, and a feed-forward 3D reconstructor (VGGT) can explain the
-generated frames as one rigid scene. Every score is calibrated against the true continuation and
-against controls: a non-rigid warp series that measures each metric's sensitivity, and a
-geometry-free floor. \todo{one-sentence headline finding once results exist.}
+future in pixels and plans against it. Planning needs that future to be geometrically
+actionable---one rigid scene seen from a camera that moves as the robot moves---not just
+plausible-looking. We audit this directly on real robot data. From real DROID wrist-camera frames,
+three open image-to-video models (LTX-Video, CogVideoX, Wan2.2) and one action-conditioned world
+model trained on DROID (Ctrl-World) predict the next five seconds. We then ask whether COLMAP,
+two-view epipolar geometry and VGGT can explain the predicted frames as one rigid scene, and
+whether the predicted camera follows the real one. Every metric is calibrated against a ladder of
+perturbed real continuations (non-rigid warps, motion-matched slow-downs, sharpness-matched blur,
+unrelated frames), which shows what each metric responds to and rules out the obvious confounds.
+The image-to-video models fail in two ways. They either distort the scene (LTX: 25\% of frames
+register in SfM, against 66\% for real footage slowed to the same camera speed) or freeze the
+camera (CogVideoX, Wan2.2: one tenth of the real camera motion), and their camera paths are no
+closer to the truth than the real path of an unrelated clip. Ctrl-World moves the camera almost as
+much as reality, keeps coarse geometry near the real level (VGGT depth disagreement at the
+4\,px-warp level), and follows the true camera path better than any unrelated path. Its fine
+detail, however, is not temporally stable, and SfM registration falls to 26\%. Action conditioning
+buys geometry that video generation alone does not, but not yet geometry accurate enough to plan
+in.
 \end{abstract}
 
 \section{Introduction}
-The debate over whether robots need world models usually compares downstream task success. We
-ask a narrower, prior question: when a learned video model predicts the future, is that future
-\emph{geometrically consistent} enough to plan in? Standard video metrics (e.g., FVD) score
-appearance and motion statistics, not whether a rigid 3D scene could have produced the frames. A
-model can score well on these metrics and still produce frames that a camera never could have
-captured.
+The debate over whether robots need world models usually compares downstream task success. We ask
+a narrower, prior question: when a learned model predicts the future of a robot's camera, is that
+future \emph{geometrically consistent} enough to plan in? Standard video metrics score appearance
+and motion statistics, not whether a rigid 3D scene seen by a moving camera could have produced
+the frames.
 
-Structure-from-motion gives an operational test. If a generated clip shows one static scene from a
-moving camera, SfM should register its frames, triangulate stable tracks, and reproject them with
-low error, just as it does on real footage of the same scene. Our contributions:
+Structure-from-motion gives an operational test. If a predicted clip shows one static scene from a
+moving camera, SfM should register its frames, triangulate stable tracks and reproject them with
+low error, just as it does on real footage. The difficulty is interpretation. A frozen camera
+produces clean but uninformative matches, blur removes features without changing geometry, and
+non-rigid distortion can still register. Raw SfM numbers on generated video are therefore easy to
+misread. We address this with controls built from the real continuation itself. Our contributions:
 \begin{itemize}
-  \item A protocol that scores generated robot video for 3D self-consistency with classical SfM,
-        epipolar geometry and a feed-forward reconstructor, at matched resolution, frame rate and
-        compression.
-  \item A calibration of every metric with a non-rigid warp series and a geometry-free floor. This
-        shows which metrics actually detect geometric distortion and which only detect total failure.
-  \item An audit of \todo{N} open video models on DROID wrist-camera data across prediction horizons
-        of 1--5\,s. \todo{findings}
+  \item A calibrated audit protocol: COLMAP, two-view epipolar geometry and VGGT, scored at matched
+        resolution, frame rate and compression, with a ladder of perturbed real continuations that
+        shows which metrics respond to geometric distortion, camera motion and lost detail.
+  \item An audit on real DROID wrist-camera clips of three open image-to-video models and one
+        action-conditioned DROID world model, including the error of the predicted camera path
+        against the true one.
+  \item Two findings. General video models fail by distorting the scene or by freezing the camera.
+        An action-conditioned model recovers motion, coarse geometry and part of the camera path,
+        but loses temporally stable fine structure.
 \end{itemize}
 
 \section{Related Work}
 \paragraph{Geometric consistency of generated video.} Running classical geometry on generated video
 is not new. Li et al.~\cite{li2024sora} used SIFT matching, RANSAC fundamental-matrix fitting,
-epipolar error and COLMAP to compare a handful of Sora, Gen-2 and Pika clips. Reconstruction-based
-metrics such as MEt3R~\cite{asim2025met3r} and WorldScore~\cite{duan2025worldscore}, and benchmarks
-such as GeoT2V-Bench~\cite{fan2026geot2v}, score multi-view or 3D consistency of generated content
-with feed-forward reconstructors~\cite{wang2024dust3r,leroy2024mast3r,wang2025vggt}.
+epipolar error and COLMAP on a handful of Sora, Gen-2 and Pika clips. Reconstruction-based metrics
+such as MEt3R~\cite{asim2025met3r} and WorldScore~\cite{duan2025worldscore}, and benchmarks such as
+GeoT2V-Bench~\cite{fan2026geot2v}, score the multi-view or 3D consistency of generated content with
+feed-forward reconstructors~\cite{wang2024dust3r,leroy2024mast3r,wang2025vggt}.
 Camera-controllable generators~\cite{he2024cameractrl,wang2024motionctrl,xu2024camco,bahmani2025ac3d}
-report camera-pose error and COLMAP-based success rates. Broader benchmarks probe visual quality
-and physical plausibility~\cite{huang2024vbench,zheng2025vbench2,li2025worldmodelbench,meng2024phygenbench,motamed2025physicsiq,bansal2025videophy}.
-These works do not calibrate their metrics. In particular, a frozen or blurry video can look
-consistent under match-count metrics (no motion, few but clean matches), a failure our controls
-expose directly.
+report camera-pose error and COLMAP-based success rates. Broader benchmarks probe visual quality and
+physical plausibility~\cite{huang2024vbench,zheng2025vbench2,li2025worldmodelbench,meng2024phygenbench,motamed2025physicsiq,bansal2025videophy}.
+These works do not calibrate their metrics against perturbed real footage. In particular, a frozen
+camera scores well under match-count metrics, a failure our controls expose directly.
 
 \paragraph{Video world models for robots.} Generative video models have been proposed as robot
 simulators and planners~\cite{yang2024unisim,du2023unipi,du2024vlp,ko2024avdc,zhu2025irasim,nvidia2025cosmos,liao2025genieenvisioner,jang2025dreamgen}.
@@ -70,55 +83,73 @@ Closest to us, RoboPhys-3D~\cite{wang2026robophys3d} reconstructs generated and 
 videos with VGGT, COLMAP and SLAM, but in simulation (RoboTwin) and without perturbed real
 references.
 
-\paragraph{Our position.} We do not claim to be first to apply SfM to generated video. Our
-contribution is a \emph{calibrated} audit on \emph{real} robot data: (i)~a ladder of perturbed real
-continuations (non-rigid warps, motion-matched slow-downs, sharpness-matched blur, unrelated frames)
-that shows what each metric responds to; (ii)~real DROID wrist-camera clips, where the camera moves
-with the arm; and (iii)~a direct comparison between general image-to-video models and an
-action-conditioned DROID world model, including the error of the predicted camera path against the
-true one.
+\paragraph{Our position.} We do not claim to be the first to apply SfM to generated video. Our
+contribution is a \emph{calibrated} audit on \emph{real} robot data. It has three parts: a ladder of
+perturbed real continuations that shows what each metric responds to; real DROID wrist-camera
+clips, where the camera moves with the arm; and a direct comparison between general image-to-video
+models and an action-conditioned DROID world model, including the predicted camera path against
+the true one.
 
 \section{Method}
-\paragraph{Conditioning clips.} We sample clips from the DROID-100 release \todo{cite DROID}. The
-exterior cameras are fixed on tripods and give SfM no baseline, so we use the wrist camera, which
-moves with the arm. For each episode we take the 5\,s window (76 frames at 15\,fps) with the most
-camera motion, measured as the median sparse optical-flow magnitude between frames eight apart,
-and keep the 60 windows with the most motion. The gripper is fixed in the wrist view and would
-anchor SfM to a false static structure. We therefore estimate one gripper mask from the pixels
-whose intensity barely changes across all clips, and apply it to every condition.
+\paragraph{Conditioning clips.} We use the DROID-100 sample of DROID~\cite{khazatsky2024droid}
+(320$\times$180, 15\,fps). The exterior cameras are fixed on tripods and give SfM no baseline, so we
+use the wrist camera, which moves with the arm. From each episode we take the 5\,s window (76
+frames) with the most camera motion, measured as the median sparse optical-flow magnitude between
+frames eight apart. We keep the 60 windows with the most motion. The gripper is fixed in the wrist
+view and would anchor SfM to a false static structure, so we estimate one gripper mask from the
+pixels that barely change across all clips and apply it to every condition.
 
-\paragraph{Generation.} Each model receives the first frame of a clip and a fixed prompt template
-built from the episode's language instruction. It generates at its native resolution and frame
-rate. We then resample every output to the evaluation format (320$\times$180, 15\,fps), replace
-frame 0 with the shared conditioning frame, and score prefixes of 1, 2, 3 and 5\,s.
-\todo{Table: models, sizes, native resolution / frames / fps, sampling steps.}
+\paragraph{Models.} Three image-to-video models receive the first frame and a fixed prompt built
+from the episode's instruction: LTX-Video~\cite{hacohen2024ltxvideo} (704$\times$480, 121 frames at
+24\,fps), CogVideoX-5B-I2V~\cite{yang2025cogvideox} (720$\times$480, 49 at 8\,fps) and
+Wan2.2-TI2V-5B~\cite{wan2025wan} (1280$\times$704, 121 at 24\,fps). Ctrl-World~\cite{guo2026ctrlworld}
+receives the first frame of all three DROID cameras and the \emph{recorded} end-effector poses of
+the real episode. It rolls out autoregressively in 1\,s chunks at 5\,Hz, and we keep its wrist view.
+Every output is resampled to 320$\times$180 and 15\,fps, frame 0 is replaced by the shared
+conditioning frame, and prefixes of 1, 2, 3 and 5\,s are scored. All models run on a single 16\,GB
+laptop GPU (RTX 5080). The two 5B models use fp8 weight storage. Because of compute, CogVideoX and
+Wan2.2 are run on 40 and 25 of the 60 clips. Comparisons use clips shared by all conditions.
 
-\paragraph{Controls.} \emph{Real}: the true continuation, round-tripped through the same H.264
-encoder (upper bound). \emph{Warp-$a$}: the true continuation with an independent smooth non-rigid
-displacement field per frame, of amplitude $a\in\{1,2,4,8\}$\,px. No single rigid scene explains
-these frames, and the distortion grows with $a$. \emph{Mix}: frames drawn from unrelated clips
-(geometry-free floor).
+\paragraph{Controls.} All controls are derived from the real continuation and pass through the same
+H.264 round trip as generated clips.
+\emph{Real}: the true continuation (the reference).
+\emph{Warp-$a$}: an independent smooth non-rigid displacement field per frame, of amplitude
+$a\in\{1,2,4,8\}$\,px. No single rigid scene explains these frames.
+\emph{Slowed}: the first 40\% of the continuation stretched over 5\,s, matching the camera speed of
+slow generators (the repeated frames are removed on the 5\,fps track below).
+\emph{Blurred}: Gaussian blur matched to the sharpness (Laplacian variance) of the softest
+generators.
+\emph{Unrelated}: frames drawn from different clips (the geometry-free floor).
 
-\paragraph{Metrics.} (i)~\emph{COLMAP} incremental SfM with a shared SIMPLE\_RADIAL camera,
-sequential matching and the gripper mask. We report the registration rate, mean reprojection error,
-mean track length, and the number of disconnected models. We lower COLMAP's default inlier
-thresholds for the low resolution. (ii)~\emph{Epipolar}: SIFT matches between frames $(i,i+g)$,
-$g\in\{1,4,8\}$, and a MAGSAC fundamental matrix. We report inliers, inlier ratio, median Sampson
-error and the fraction of pairs that fail to match. (iii)~\emph{VGGT depth consistency}: frame
-$i$'s predicted depth, unprojected with its predicted camera and reprojected into frame $j$, should
-agree with frame $j$'s depth. We report the median relative disagreement. None of the metrics
-compares the generated camera path to the real one, because image-conditioned models do not
-control the camera and a different path is legitimate.
+\paragraph{Metrics.} (i)~\emph{COLMAP}~\cite{schonberger2016sfm}: incremental SfM with one shared
+camera, sequential matching and the gripper mask. Inlier thresholds are lowered for the low
+resolution. We report registration rate and reprojection error.
+(ii)~\emph{Epipolar}: SIFT~\cite{lowe2004sift} matches between frame pairs and a MAGSAC
+fundamental matrix~\cite{barath2019magsac}. We report inliers, median Sampson error, the fraction
+of pairs that fail to match, and median feature displacement as a camera-motion measure.
+(iii)~\emph{VGGT}~\cite{wang2025vggt}: frame $i$'s predicted depth, unprojected with its predicted
+camera and reprojected into frame $j$, should agree with frame $j$'s depth. We report the median
+relative disagreement at 0.4\,s.
+(iv)~\emph{Camera path}: VGGT camera centers of the prediction against those of the real
+continuation, after a Sim(3) alignment, as RMSE divided by the real path length. This is
+meaningful only for Ctrl-World, which receives the real actions. For the other models it
+quantifies how unrelated their camera is to the truth.
+Because Ctrl-World generates at 5\,Hz, COLMAP and epipolar metrics are reported on a 5\,fps track
+(every third frame) for every condition. On that track no condition contains repeated frames.
 
 \section{Results}
-\subsection{Which metrics detect geometric distortion?}
-Table~\ref{tab:controls} gives the control results at the 5\,s horizon (60 clips). Reprojection
-and Sampson error rise monotonically with warp amplitude, and track length and epipolar inliers
-fall once the warp reaches 4\,px. Registration rate
-and point count do not: COLMAP still registers heavily warped frames, and broken tracks produce
-\emph{more}, shorter 3D points. These two metrics only flag total failure (the Mix floor registers
-under 1\% of frames). We therefore lead with the metrics that respond to distortion, and report
-registration only as a failure indicator.
+\subsection{What the metrics respond to}
+Table~\ref{tab:controls} gives the warp ladder (15\,fps track, 60 clips). Reprojection, Sampson and
+VGGT error rise monotonically with warp amplitude, and epipolar inliers fall. VGGT is the least
+sensitive: it moves clearly only at 8\,px. Registration rate does not respond to distortion.
+COLMAP still registers heavily warped frames, so registration flags only outright failure (the
+unrelated-frames floor registers under 1\%). The slowed and blurred controls (Table~\ref{tab:main})
+separate the two remaining confounds:
+\begin{itemize}
+  \item Halving the camera motion barely changes registration (66\% vs.\ 59\%) and lowers VGGT error.
+  \item Blur matched to the softest generators does not hurt either: registration rises to 76\%,
+        and VGGT error is unchanged (0.029 vs.\ 0.028).
+\end{itemize}
 
 \begin{table}[h]
 \centering
@@ -126,50 +157,97 @@ registration only as a failure indicator.
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcccccc}
 \toprule
- & Real (re-enc.) & Warp-1 & Warp-2 & Warp-4 & Warp-8 & Mix \
+ & Real & Warp-1 & Warp-2 & Warp-4 & Warp-8 & Unrelated \\
 \midrule
-Reprojection error (px) $\downarrow$ & 0.69 $\pm$ .02 & 0.75 $\pm$ .03 & 0.89 $\pm$ .02 & 1.11 $\pm$ .03 & 1.40 $\pm$ .01 & --$^\ddagger$ \
-Median Sampson error, $g{=}4$ (px) $\downarrow$ & 0.33 $\pm$ .01 & 0.34 $\pm$ .01 & 0.37 $\pm$ .01 & 0.42 $\pm$ .01 & 0.51 $\pm$ .02 & --$^\dagger$ \
-Track length $\uparrow$ & 9.5 $\pm$ 0.4 & 9.3 $\pm$ 0.4 & 9.6 $\pm$ 0.4 & 8.0 $\pm$ 0.4 & 6.1 $\pm$ 0.1 & 2.4 $\pm$ 0.2 \
-Epipolar inliers per pair, $g{=}4$ $\uparrow$ & 58 $\pm$ 5 & 60 $\pm$ 5 & 58 $\pm$ 5 & 53 $\pm$ 5 & 44 $\pm$ 4 & 15 $\pm$ 1 \
-Pairs failing to match, $g{=}4$ $\downarrow$ & 8\% & 9\% & 9\% & 9\% & 10\% & 84\% \
-Registration rate (largest model) & 0.81 $\pm$ .04 & 0.81 $\pm$ .04 & 0.81 $\pm$ .04 & 0.69 $\pm$ .05 & 0.90 $\pm$ .03 & 0.004 \
+Reprojection error (px) $\downarrow$ & 0.69 & 0.75 & 0.89 & 1.11 & 1.40 & -- \\
+Median Sampson error (px) $\downarrow$ & 0.33 & 0.34 & 0.37 & 0.42 & 0.51 & -- \\
+Epipolar inliers per pair $\uparrow$ & 58 & 60 & 58 & 53 & 44 & 15 \\
+VGGT depth disagreement $\downarrow$ & 0.026 & 0.026 & 0.027 & 0.029 & 0.039 & 0.67 \\
+Registration rate & 0.81 & 0.81 & 0.81 & 0.69 & 0.90 & 0.004 \\
 \bottomrule
 \end{tabular}
-\caption{Metric calibration on controls, 5\,s horizon, 60 clips, mean $\pm$ s.e.m.
-$^\dagger$Computed only on the few pairs that match at all; not comparable.
-$^\ddagger$Too few frames register for a meaningful value. \todo{add VGGT row.}}
+\caption{Metric calibration on the warp ladder, 15\,fps track, 5\,s horizon, 60 clips (means;
+standard errors are at most 0.03\,px for reprojection, 0.02\,px for Sampson error, 5 inliers and
+0.003 for VGGT). Epipolar metrics use a 4-frame gap. ``--'': too few frames register or match for
+a meaningful value.}
 \label{tab:controls}
 \end{table}
 
-\subsection{Generated futures}
-\paragraph{LTX-Video (60 clips, 5\,s horizon).} \todo{add CogVideoX and Wan2.2 on the shared 40
-clips.} SfM registers only 32\% of LTX frames ($\pm$4\%), against 81\% for the re-encoded real
-continuation. Even the heaviest warp control still registers 90\%. LTX also moves the camera much
-less (7.4 vs.\ 17.0\,px of feature motion per four frames), so we add a motion-matched control:
-the real continuation slowed $2.5\times$ (7.3\,px). It still registers 78\% of frames, and only
-5\% of its frame pairs fail to match, against 25\% for LTX. Low camera motion therefore does not
-explain the failure; LTX futures are geometrically inconsistent. LTX's lower reprojection error
-(0.39 vs.\ 0.69\,px) is a survivor effect, because only small consistent fragments reconstruct at
-all. This is why we treat reprojection and Sampson error as conditional on successful
-reconstruction, and always report them with registration and match-failure rates. (The slowed
-control repeats frames, which inflates its track length and inlier count. Registration rate is
-not inflated this way.)
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\input{results_table}
+\caption{Main results, 5\,s horizon, 25 clips available in every condition, mean $\pm$ s.e.m.
+Motion, registration, match failure, inliers and Sampson error use the 5\,fps track (epipolar gap
+0.4\,s). VGGT depth disagreement (0.4\,s) and camera-path error are computed from VGGT on the full
+clip. Path-error reference levels on all 60 clips: re-encoded real 0.016, blurred 0.027, warp-8
+0.047, slowed 0.104, \emph{real path of an unrelated clip} 0.116, \emph{frozen camera} 0.164.}
+\label{tab:main}
+\end{table}
 
-\todo{Horizon curves per model with the Real band and the Warp series as reference levels; table
-at 5\,s; qualitative COLMAP reconstructions real vs.\ generated; failure gallery.}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig_models_ep005.jpg}
+\caption{One clip, frames at 0, 1, 2, 3, 4 and 5\,s. Rows: real, Ctrl-World, Wan2.2, CogVideoX,
+LTX-Video. Ctrl-World follows the real camera motion (soft and losing texture). Wan2.2 cuts to a
+third-person view. CogVideoX holds the viewpoint while objects morph. LTX dissolves the gripper and
+scene.}
+\label{fig:qual}
+\end{figure}
+
+\subsection{Image-to-video models: distorted geometry or a frozen camera}
+LTX moves the camera at less than half the real speed (10.3 vs.\ 24.2\,px). Against real footage
+slowed to the same speed (10.9\,px), it registers 25\% of frames instead of 66\%, fails to match
+32\% of frame pairs instead of 6\%, and its VGGT depth disagreement is about $1.7\times$ higher
+(0.024 vs.\ 0.014 on all 60 clips). LTX futures are geometrically inconsistent, not merely slow.
+Its \emph{low} Sampson and reprojection errors are a survivor effect: only small consistent
+fragments reconstruct at all.
+
+CogVideoX and Wan2.2 fail differently. Their cameras barely move (2.4 and 2.6\,px, a tenth of the
+real motion). Their frames therefore match almost trivially (2--4\% match failures, 120--130
+inliers), but they give SfM no parallax (20--27\% registration). The predicted future is a nearly
+static view in which objects change (Figure~\ref{fig:qual}). Match-count and error metrics alone
+would rank these two models \emph{above} real footage. The motion measure and the controls are
+what reveal the failure.
+
+None of the three is told what the robot does, so their camera paths are unrelated to the true
+one. Path errors of 0.12--0.14 are no better than substituting the real path of an unrelated clip
+(0.116).
+
+\subsection{An action-conditioned world model: right motion, unstable detail}
+Ctrl-World is the only model whose camera moves like the real one (19.7 vs.\ 24.2\,px). Its coarse
+geometry is close to real: VGGT depth disagreement is 0.031 (0.029 on all 60 clips), against 0.028
+for real footage, the 4\,px-warp level on the calibration ladder. Its camera follows the true path
+better than any unrelated path (0.085 vs.\ 0.116), but remains about $5\times$ the re-encoding
+noise floor (0.016), so it reproduces the real trajectory only partly.
+
+SfM tells a different story at the level of features. Ctrl-World registers 26\% of frames, fails to
+match 36\% of frame pairs, and keeps half the real inliers (24 vs.\ 54). Blur does not explain this:
+real footage blurred to the same sharpness registers 76\%. Nor do the 1\,s chunk boundaries: match
+failures are spread evenly across positions within a chunk (16--23\% vs.\ 3--5\% for real).
+Instead, fine texture is re-synthesized frame to frame, so local features do not persist even
+though the scene's layout and the camera's motion do.
 
 \section{Discussion: what this means for the world-model debate}
-\todo{Write once results exist. Frame: if generated futures sit at Warp-$a$ levels of distortion,
-then geometry extracted from them is as unreliable as geometry from a real scene corrupted by $a$
-pixels of non-rigid noise. The warp series turns the scores into an interpretable "equivalent
-distortion".}
+Without access to the robot's actions, the three image-to-video models produce futures that are
+either geometrically distorted or motionless. Under plausible-looking pixels, neither supports
+recovering where the camera went or what the scene looks like in 3D. Conditioning on actions
+changes this qualitatively. Ctrl-World's predicted camera moves, its coarse geometry sits near the
+real level, and its camera path is informative. It also shows where world models still fall
+short: geometry that is right on average but not stable in detail, and a path that is only partly
+correct. For planners that consume dense geometry (depth, coarse layout), this kind of world model
+may already be useful. Planners that track features or need metric camera motion over seconds
+cannot yet rely on it. The calibration ladder makes these statements quantitative, and we suggest
+that geometric claims about world models report such controls alongside raw SfM numbers.
 
 \section{Limitations}
-A single dataset and camera (DROID wrist view at 320$\times$180). A small set of open models that
-fit a 16\,GB GPU. Image- and text-conditioned generation without action conditioning. Scene motion
-(the arm, manipulated objects) that violates rigidity even in real clips; the real-clip baseline
-absorbs this, but does not remove it.
+A single dataset and camera (DROID wrist view at 320$\times$180). Small open models that fit a
+16\,GB GPU, and fewer clips for the two slowest models. DROID-100 episodes are most likely part of
+Ctrl-World's training data, so its results are a best case. Scene motion (the arm and manipulated
+objects) violates rigidity even in real clips. The real reference absorbs this but does not remove
+it. Camera paths are compared through VGGT estimates on both sides rather than calibrated
+ground-truth poses.
 
 \bibliographystyle{plain}
 \bibliography{refs}
