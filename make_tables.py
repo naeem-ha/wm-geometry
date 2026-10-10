@@ -62,7 +62,12 @@ def main():
         cells = []
         for col, *_ in COLS:
             v = g[col].dropna()
-            cells.append("--" if v.empty else f"{v.mean():.2f} $\\pm$ {v.sem():.2f}")
+            if v.empty:
+                cells.append("--")
+                continue
+            m = abs(v.mean())
+            nd = 3 if m < 0.1 else (1 if m >= 10 else 2)  # keep small VGGT/path errors readable
+            cells.append(f"{v.mean():.{nd}f} $\\pm$ {v.sem():.{nd}f}")
         lines.append(f"{label} & " + " & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     tex = "\n".join(lines)
