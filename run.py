@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
 REAL = WORK / "real"
 HORIZONS_S = (1, 2, 3, 5)  # scored as prefixes of each continuation
+VGGT_HORIZONS_S = (2, 5)   # VGGT is the slow scorer (~4 s per clip-horizon), so only two horizons
 WARP_AMPS = (1, 2, 4, 8)   # px at EVAL resolution
 SLOW_FACTORS = (2.5, 12)   # motion-matched to LTX (~7.4 px / 4 frames) and CogVideoX (~1.5 px)
 
@@ -152,9 +153,10 @@ def cmd_score(a):
             scores = json.loads(out.read_text()) if out.exists() else {}
             for h in HORIZONS_S:
                 prev = scores.get(str(h), {})
-                if "reg_rate" in prev and (not use_vggt or "vggt" in prev):
+                vggt_h = use_vggt and h in VGGT_HORIZONS_S
+                if "reg_rate" in prev and (not vggt_h or "vggt" in prev):
                     continue
-                scores[str(h)] = _score_one(clip_dir, mask_png, h, prev, use_vggt, step)
+                scores[str(h)] = _score_one(clip_dir, mask_png, h, prev, vggt_h, step)
                 out.write_text(json.dumps(scores, indent=1, default=float))
             print(f"{cond.name}/{clip_dir.name} scored", flush=True)
 
