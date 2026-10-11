@@ -60,16 +60,24 @@ GeoT2V-Bench~\citep{fan2026geot2v} score 3D consistency with feed-forward
 reconstructors~\citep{wang2024dust3r,leroy2024mast3r,wang2025vggt}. Camera-controllable
 generators~\citep{he2024cameractrl,xu2024camco,bahmani2025ac3d} report pose error and COLMAP success
 rates, and broader benchmarks probe visual and physical
-plausibility~\citep{huang2024vbench,li2025worldmodelbench,motamed2025physicsiq}. These scores are not
-calibrated against perturbed real footage. For robots, video models serve as simulators and
+plausibility~\citep{huang2024vbench,li2025worldmodelbench,motamed2025physicsiq}. Several of the
+confounds we study have been observed before. MEt3R~\citep{asim2025met3r} notes that shorter camera
+trajectories score as more consistent and that blur-sensitive metrics can favor generated over real
+footage. GeoT2V-Bench~\citep{fan2026geot2v} reports image motion and disagreements between geometry
+measures. RoboPhys-3D~\citep{wang2026robophys3d} finds generated robot videos matching or exceeding
+ground truth on geometric consistency despite wrong scene state. What
+these works do not provide is a controlled perturbation study on real footage that quantifies how
+each confound changes model comparisons. For robots, video models serve as simulators and
 planners~\citep{yang2024unisim,du2023unipi,ko2024avdc,zhu2025irasim,nvidia2025cosmos,jang2025dreamgen},
 and action-conditioned models trained on real data, such as Ctrl-World~\citep{guo2026ctrlworld} on
 DROID~\citep{khazatsky2024droid}, target policy evaluation in imagination. Robot world models are
 mostly evaluated by policy-ranking agreement or visual
 fidelity~\citep{quevedo2025worldgym,li2025worldeval,yue2025ewmbench}. Closest to us,
 RoboPhys-3D~\citep{wang2026robophys3d} reconstructs generated robot videos with VGGT, COLMAP and SLAM,
-but in simulation and without perturbed real references. We do not claim the first SfM analysis of
-generated video. We contribute the calibration ladder and an audit on real robot data.
+but in simulation (RoboTwin) and without perturbed real references. We do not claim the first SfM
+analysis of generated video, nor the first observation of these confounds. We contribute paired,
+per-clip controls on real robot wrist-camera footage that show how motion and appearance change
+geometric model comparisons.
 
 \section{Method}
 \textbf{Clips and models.} From the DROID-100 sample~\citep{khazatsky2024droid} (320$\times$180, 15\,fps)
@@ -91,9 +99,10 @@ matches LTX's average image motion at the dataset level; \emph{blurred}, Gaussia
 sharpness of the softest outputs; and \emph{unrelated}, frames from other clips.
 
 \textbf{Metrics.} All metrics use the 5\,s horizon at 5\,fps (every third frame, so Ctrl-World's 5\,Hz
-output has no repeated frames) and frame pairs 0.4\,s apart. We use COLMAP~\citep{schonberger2016sfm}
-registration rate and SIFT~\citep{lowe2004sift} + MAGSAC~\citep{barath2019magsac} epipolar inliers,
-Sampson error and match-failure rate. Pairs with too few matches count as failures, and Sampson
+output has no repeated frames). We use COLMAP~\citep{schonberger2016sfm} registration rate (sequential
+matching with an overlap of 10 frames) and pairwise metrics on frame pairs 0.4\,s apart:
+SIFT~\citep{lowe2004sift} + MAGSAC++~\citep{barath2020magsacpp} epipolar inliers, Sampson error and
+match-failure rate. Pairs with too few matches count as failures, and Sampson
 error averages only pairs where matching and fundamental-matrix estimation succeed. Median feature
 displacement serves as an \emph{image-motion proxy}. It reflects camera motion, but also scene depth,
 moving objects and which features survive matching. VGGT~\citep{wang2025vggt} depth disagreement is the
@@ -212,10 +221,18 @@ VGGT-estimated reference up to scale.
 \appendix
 \section{Implementation details}
 \label{app:details}
+\textbf{Checkpoints} (Hugging Face repository at commit). LTX-Video: \texttt{Lightricks/LTX-Video}, the
+2B diffusers-format weights in the repository root, \texttt{8984fa2}. CogVideoX:
+\texttt{zai-org/CogVideoX-5b-I2V}, \texttt{a6f0f48}. Wan2.2: \texttt{Wan-AI/Wan2.2-TI2V-5B-Diffusers},
+\texttt{b8fff73}. Ctrl-World: \texttt{yjguo/Ctrl-World} (\texttt{checkpoint-10000.pt}), \texttt{8cf8146},
+with \texttt{stabilityai/stable-video-diffusion-img2vid} (\texttt{9cf024d}) and
+\texttt{openai/clip-vit-base-patch32}. VGGT: \texttt{facebook/VGGT-1B}, \texttt{860abec}. LTX uses the
+bf16 T5-v1.1-XXL text encoder from the CogVideoX repository.
+
 \textbf{Generation.} LTX-Video: 704$\times$480, 121 frames at 24\,fps, 40 steps. CogVideoX-5B-I2V:
 720$\times$480, 49 frames at 8\,fps, 50 steps. Wan2.2-TI2V-5B: 1280$\times$704, 121 frames at 24\,fps,
-40 steps. Ctrl-World: official DROID checkpoint, replay of recorded 7-D end-effector states (xyz,
-roll-pitch-yaw, gripper), 50 steps. It runs seven rollout steps at 5\,Hz, each generating five frames
+40 steps. Ctrl-World: replay of recorded 7-D end-effector states (xyz, roll-pitch-yaw, gripper),
+50 steps. It runs seven rollout steps at 5\,Hz, each generating five frames
 that include the previous step's last frame, so each step advances four frames (0.8\,s). Of the 29
 frames, the first 26 (5\,s) are kept. The 5B transformers store weights in fp8 and compute in bf16.
 One prompt template uses the episode instruction (a neutral instruction where DROID-100 has none).
