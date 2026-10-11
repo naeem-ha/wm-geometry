@@ -20,15 +20,16 @@ Geometric scores such as SfM registration or reprojection error are increasingly
 whether video models can serve as robot world models. We show that these scores cannot be read
 without motion-aware controls. On real DROID wrist-camera clips, three image-to-video models
 (LTX-Video, CogVideoX, Wan2.2) and an action-conditioned DROID world model (Ctrl-World) predict the
-next five seconds. We score the predictions with COLMAP, epipolar geometry and VGGT, and calibrate
-each score against perturbed real continuations: non-rigid warps, approximately motion-matched
-slow-downs, sharpness-matched blur and unrelated frames. The controls change the reading of the
-results. Two models score \emph{better} than real footage on match counts and VGGT depth
-disagreement because their predicted views barely move. LTX is worse than real footage slowed to a
-similar image motion. Ctrl-World is the only model whose image motion approaches the real level,
-and on these 25 clips its VGGT depth disagreement shows no statistically detectable difference from
-real footage. Its features, however, do not persist across frames, and none of the models'
-VGGT-estimated camera paths is reliably closer to the reference than an unrelated clip's path.
+next five seconds. We score the predictions with COLMAP, epipolar geometry and VGGT, and compare each
+clip against controls built from real footage: non-rigid warps, sharpness-matched blur, unrelated
+frames, a frozen first frame and, per clip, same-episode real footage matched to the clip's image
+motion. Raw comparisons with the real continuation are misleading. A frozen frame beats real footage
+on match failure, inliers and VGGT depth disagreement. Two near-static generators look better than
+real on the same scores, and their advantages shrink or vanish against motion-matched real footage.
+Ctrl-World, whose image motion approaches the real level, matches the real continuation in raw VGGT
+disagreement but is worse than motion-matched real footage on the shared clips, although this
+difference is smaller and not significant on all 60 clips. Its features do not persist across frames, and no model's VGGT-estimated camera path is reliably closer to the
+reference than an unrelated clip's path.
 \end{abstract}
 
 \keywords{World models, video prediction, structure-from-motion, evaluation}
@@ -44,13 +45,12 @@ changing geometry, and non-rigid distortion can still register.
 
 We therefore calibrate every score against controls built from the real continuation, and evaluate
 general image-to-video models and an action-conditioned robot world model on real DROID wrist-camera
-clips. Contributions: (i) a calibration ladder of perturbed real continuations (non-rigid warps,
-approximately motion-matched slow-downs, sharpness-matched blur, unrelated frames) that shows what
-COLMAP, epipolar and VGGT scores respond to; (ii) an audit with paired confidence intervals, which
-shows that motion-unaware scores would rank nearly static predictions above real footage; and (iii)
-a finding on the action-conditioned Ctrl-World model. Its image motion approaches the real level and
-its VGGT depth disagreement shows no detectable difference from real footage, while its local
-features remain temporally unstable.
+clips. Contributions: (i) a control ladder (non-rigid warps, sharpness-matched blur, unrelated
+frames, a frozen frame) that shows what COLMAP, epipolar and VGGT scores respond to; (ii) per-clip,
+same-episode motion-matched real references, which show with paired confidence intervals that raw
+comparisons flatter near-static predictions and can hide deficits in moving ones; and (iii) a
+repeatable reporting protocol: report image motion and match coverage, compare against matched real
+references, and keep the scores separate rather than combining them.
 
 \section{Related Work}
 Classical geometry has been applied to generated video before: Li et al.~\citep{li2024sora} measured
@@ -58,9 +58,8 @@ SIFT/RANSAC epipolar consistency and COLMAP reconstructions on a handful of Sora
 clips, and MEt3R~\citep{asim2025met3r}, WorldScore~\citep{duan2025worldscore} and
 GeoT2V-Bench~\citep{fan2026geot2v} score 3D consistency with feed-forward
 reconstructors~\citep{wang2024dust3r,leroy2024mast3r,wang2025vggt}. Camera-controllable
-generators~\citep{he2024cameractrl,xu2024camco,bahmani2025ac3d} report pose error and COLMAP success
-rates, and broader benchmarks probe visual and physical
-plausibility~\citep{huang2024vbench,li2025worldmodelbench,motamed2025physicsiq}. Several of the
+generators report pose error and COLMAP success rates~\citep{he2024cameractrl,xu2024camco,bahmani2025ac3d},
+and broader benchmarks probe plausibility~\citep{huang2024vbench,li2025worldmodelbench,motamed2025physicsiq}. Several of the
 confounds we study have been observed before. MEt3R~\citep{asim2025met3r} notes that shorter camera
 trajectories score as more consistent and that blur-sensitive metrics can favor generated over real
 footage. GeoT2V-Bench~\citep{fan2026geot2v} reports image motion and disagreements between geometry
@@ -88,24 +87,29 @@ episode instruction. Ctrl-World~\citep{guo2026ctrlworld} receives the first fram
 cameras and the \emph{recorded} end-effector poses. It rolls out at 5\,Hz in overlapping five-frame
 chunks, each advancing four frames (0.8\,s). Ctrl-World thus differs from the other models in its
 inputs, architecture and training data, not only in action conditioning. Outputs are resampled to
-320$\times$180 and share the real first frame. All results use the 25 clips that every condition
-covers. Compute (one 16\,GB laptop GPU) limited the slowest model, Wan2.2, to 25 clips
-(Appendix~\ref{app:details}).
+320$\times$180 and share the real first frame. Generation ran in episode order and never failed. Compute
+(one 16\,GB laptop GPU) limited the slowest model, Wan2.2, to the first 25 clips, so these 25 are the
+clips shared by all models. LTX and Ctrl-World cover all 60 (Appendix~\ref{app:details}).
 
-\textbf{Controls.} All controls derive from the real continuation and share the generators' H.264
-round trip: \emph{real}; \emph{warp-$a$}, an independent smooth non-rigid warp per frame
-($a\in\{1,2,4,8\}$\,px); \emph{slowed}, the first 40\% stretched over 5\,s, which approximately
-matches LTX's average image motion at the dataset level; \emph{blurred}, Gaussian blur matched to the
-sharpness of the softest outputs; and \emph{unrelated}, frames from other clips.
+\textbf{Controls.} All controls are real footage and share the generators' H.264 round trip:
+\emph{real}, the true continuation; \emph{warp-$a$}, an independent smooth non-rigid warp per frame
+($a\in\{1,2,4,8\}$\,px); \emph{blurred}, Gaussian blur matched to the softest outputs' sharpness;
+\emph{slowed}, the first 40\% stretched over 5\,s; \emph{unrelated}, frames from other clips; and
+\emph{frozen}, the first frame repeated. \emph{Motion-matched} references are chosen per generated
+clip from real footage of the same episode (same scene and camera): the true continuation slowed by
+up to 3$\times$ (no repeated frames at 5\,fps) or any other 5\,s window of the episode. We keep the
+candidate closest in image motion if it is within 25\%, and repeat the matching with two independent
+motion estimators (below).
 
 \textbf{Metrics.} All metrics use the 5\,s horizon at 5\,fps (every third frame, so Ctrl-World's 5\,Hz
 output has no repeated frames). We use COLMAP~\citep{schonberger2016sfm} registration rate (sequential
 matching with an overlap of 10 frames) and pairwise metrics on frame pairs 0.4\,s apart:
 SIFT~\citep{lowe2004sift} + MAGSAC++~\citep{barath2020magsacpp} epipolar inliers, Sampson error and
 match-failure rate. Pairs with too few matches count as failures, and Sampson
-error averages only pairs where matching and fundamental-matrix estimation succeed. Median feature
+error averages only pairs where matching and fundamental-matrix estimation succeed. Median SIFT-match
 displacement serves as an \emph{image-motion proxy}. It reflects camera motion, but also scene depth,
-moving objects and which features survive matching. VGGT~\citep{wang2025vggt} depth disagreement is the
+moving objects and which features survive matching, so we also match with median dense
+Farneback optical flow, which does not depend on matched features. VGGT~\citep{wang2025vggt} depth disagreement is the
 median relative difference when frame $i$'s confident depth is reprojected into frame $j$. It
 measures the internal consistency of VGGT's own depth and pose predictions, not ground-truth
 geometry. We therefore report the fraction of points that land in frame (coverage) and a
@@ -131,89 +135,80 @@ clip 0.115). Valid clips per metric are 22--25.}
 \label{tab:main}
 \end{table}
 
-\begin{table}[t]
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\input{tab_calib}
-\vspace{4pt}
-\caption{Calibration ladder at the main settings (5\,fps, 0.4\,s pairs, same 25 clips). ``--'': too few
-frames register.}
-\label{tab:calib}
-\end{table}
-
-\textbf{What the scores respond to.} On the warp ladder (Table~\ref{tab:calib}), reprojection error,
+\textbf{What the scores respond to.} On the warp ladder (Table~\ref{tab:calib}, Appendix~\ref{app:calib}), reprojection error,
 Sampson error and default VGGT disagreement rise monotonically with distortion. Filtered VGGT stays
-flat up to 2\,px and then rises. Registration rate fluctuates (0.59, 0.73, 0.64, 0.56, 0.70) and does
-not decrease with distortion, so it is a poor measure of distortion. Neither halving image motion
-nor blurring to the softest outputs' sharpness lowers registration (66\% and 76\% vs.\ 59\%,
-Table~\ref{tab:main}). Slowing lowers VGGT disagreement, because frames 0.4\,s apart are closer in
-viewpoint. Comparisons therefore require motion-matched references.
+flat up to 2\,px, then rises. Registration (0.59, 0.73, 0.64, 0.56, 0.70) does not decrease
+monotonically with distortion. Slowing and blurring do not lower registration (66\% and 76\% vs.\
+59\%, Table~\ref{tab:main}), but slowing lowers VGGT disagreement, so image motion shifts the scores.
 
 \begin{table}[t]
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3pt}
-\resizebox{\linewidth}{!}{\input{tab_diff}}
+\resizebox{0.78\linewidth}{!}{\input{tab_matched}}
 \vspace{4pt}
-\caption{Paired differences (model $-$ control) on the 25 clips, mean [95\% bootstrap CI]. Each model
-is compared with the control matched to its confound: slowed (image motion) for LTX, blurred
-(sharpness) for Ctrl-World.}
+\caption{Paired differences, model $-$ reference, on the clips for which a motion-matched reference
+exists ($n$; SIFT-displacement matching, median matching error 1--4\%). ``real'': the true
+continuation. ``matched'': same-episode real footage matched to the clip's image motion. Pairwise
+metrics at 0.4\,s. $^*$: 95\% bootstrap CI excludes zero. Lower is better for Fail and VGGT, higher
+for Inliers and Reg. Other gaps and dense-flow matching are in Table~\ref{tab:robust}.}
 \label{tab:diff}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{fig_qual_ep005.pdf}
+\includegraphics[width=0.88\linewidth]{fig_qual_ep005.pdf}
 \caption{One clip, 0--5\,s. Ctrl-World follows the real camera motion (softer, losing texture).
 Wan2.2 cuts to a third-person view, CogVideoX holds the view while objects morph, and LTX distorts
 the scene. A median-performance example is in Appendix~\ref{app:details}.}
 \label{fig:qual}
 \end{figure}
 
-\textbf{Motion-unaware scores reward nearly static predictions.} CogVideoX's and Wan2.2's image motion
-is about a tenth of the real level (2.4--2.6 vs.\ 24\,px). Their frames match trivially (120--130
-inliers), and their match failure and VGGT disagreement are significantly \emph{lower} than real
-footage's (Table~\ref{tab:diff}). Read without the motion measure, these scores would rank both models
-above reality. The predicted futures are nearly static views in which objects change
-(Figure~\ref{fig:qual}), and SfM registers 20--27\% of frames for lack of parallax.
+\textbf{Raw comparisons reward uninformative output.} A frozen first frame beats the real
+continuation on match failure, inliers and both VGGT variants, all significantly (Table~\ref{tab:diff}),
+while registering 64 points fewer frames. CogVideoX's and Wan2.2's image motion is about a tenth of the
+real level (2.4--2.6 vs.\ 24\,px, Table~\ref{tab:main}). On their matchable clips they too look better
+than the real continuation (Table~\ref{tab:diff}), and their predicted futures are nearly static views
+in which objects change (Figure~\ref{fig:qual}).
 
-\textbf{Motion-matched comparison exposes distortion.} LTX's average image motion is close to the
-slowed control's (10.3 vs.\ 10.9\,px), so the two are approximately motion-matched at the dataset
-level. Against that reference, LTX's registration is 41 points lower, its match failure 26 points
-higher, and its VGGT disagreement higher in both variants, with all CIs excluding zero. Its low
-Sampson error must be read alongside its match failures, because Sampson error summarizes only the
-pairs for which geometric estimation succeeds.
+\textbf{Motion-matched references shrink or remove apparent advantages.} Against same-episode real
+footage with the same image motion, CogVideoX's VGGT advantage shrinks by about 70\% ($-$0.039 to
+$-$0.011) but remains significant, and Wan2.2's disappears ($-$0.010 to +0.005). The same holds at the
+other gaps and with dense-flow matching (Table~\ref{tab:robust}). LTX's significant VGGT advantage at
+0.8\,s ($-$0.019, dense matching) vanishes against matched footage, and its match-failure gap widens
+(+0.32 to +0.38). Only 6--9 of 25 clips could be matched for the near-static models, because real
+footage rarely moves that little, so these estimates are imprecise. Low Sampson error
+(Table~\ref{tab:main}) must be read alongside match failures, because it summarizes only pairs for
+which geometric estimation succeeds.
 
-\textbf{Ctrl-World: near-real motion, no detectable difference in dense consistency, unstable
-features.} The action-conditioned Ctrl-World model is the only one whose image motion approaches
-the real level (19.7 vs.\ 24.2\,px). On these 25 clips, its VGGT depth disagreement shows no
-statistically detectable difference from real footage in either variant (+0.003, CI [$-$0.004, 0.010]
-and [$-$0.002, 0.007]; real mean 0.028), at equal coverage (0.86 vs.\ 0.87). This does not establish
-equivalent geometry: the intervals still allow a sizable increase. Feature-level scores disagree.
-Registration is 33 points lower and match failure 24 points higher than real, and the gap is larger
-still against sharpness-matched blurred real footage, so this blur setting does not explain it.
-Match failures show no obvious concentration at chunk transitions (Appendix~\ref{app:details}).
-The pattern is consistent with temporally unstable texture under a stable layout. Ctrl-World's
-VGGT-estimated camera path is not reliably closer to the reference than an unrelated clip's real path
-($-$0.015, CI [$-$0.034, 0.003]). At this resolution the path metric separates only near-exact
-trajectories (re-encoded real 0.017, warps $\le$0.047). Even slowed real footage, with the right path
-shape but wrong timing, does not beat the unrelated baseline.
+\textbf{Motion-matched references can expose a hidden deficit.} The action-conditioned Ctrl-World
+model moves the image almost as much as reality (19.7 vs.\ 24.2\,px). Against the real continuation,
+its VGGT disagreement shows no detectable difference ($+$0.000). Against motion-matched real footage on
+the shared clips it is higher: +0.007, +0.008 and +0.018 at 0.2, 0.4 and 0.8\,s, all significant under
+SIFT matching, and with the same sign but significant only at 0.2\,s under dense matching (22--23
+clips). On all 60 clips it keeps its sign but is smaller and not significant (+0.002 to +0.004,
+Appendix~\ref{app:robust}): suggestive, not established.
+Its feature-level scores are worse in every comparison. Registration is 33 points lower than real
+and 50 points lower than sharpness-matched blurred real footage. Match failure is 24 and 21 points
+higher, respectively, so blur at this level does not explain the deficit. With no obvious
+concentration at rollout-step transitions (Appendix~\ref{app:details}), this is consistent with
+temporally unstable texture. No model's VGGT-estimated camera path is reliably closer to the reference than an
+unrelated clip's real path (Ctrl-World $-$0.015, CI [$-$0.034, 0.003]). The path metric
+separates only near-exact trajectories (re-encoded real 0.017, warps $\le$0.047).
 
 \section{Discussion and Limitations}
-Geometric scores of generated video measure several things at once: scene consistency, image motion
-and feature persistence. A model that stops the camera or softens texture can look better or worse
-for reasons unrelated to 3D consistency. Our calibration ladder separates these factors, and doing so
-changes the conclusions. Two models that would score above real footage are nearly static, and the
-action-conditioned model's low registration coexists with no detectable difference in dense VGGT
-consistency. We do not claim that action conditioning causes Ctrl-World's behavior, because it also
+Geometric scores of generated video conflate scene consistency, image motion and feature
+persistence, and comparing against the real continuation alone does not separate them. Per-clip motion-matched references change the conclusions in both directions: they
+shrink or remove the advantages of near-static predictions, and on the shared clips they reveal a
+deficit, hidden in the raw comparison, in the one model whose image motion approaches reality. We propose a simple protocol: report image
+motion (with two estimators) and match coverage, compare each clip against a frozen frame and
+against motion- and appearance-matched real references, and report the scores separately rather than
+as one number. We do not claim that action conditioning causes Ctrl-World's behavior, because it also
 differs in inputs, architecture and training data. Nor do we claim that these scores predict
-planning success. We suggest that geometric evaluations of world models report motion-matched and
-appearance-matched controls alongside raw scores. \textbf{Limitations:} one dataset and camera at low
-resolution; 25 clips and small open models; DROID-100 is likely within Ctrl-World's training data (a
-best case); arm and object motion violate rigidity even in real clips; image motion is a proxy for
-camera motion; VGGT-based scores reflect VGGT's own predictions; and camera paths are compared to a
-VGGT-estimated reference up to scale.
+planning success. \textbf{Limitations:} one dataset and camera at low resolution; 25 shared clips,
+few matchable for near-static models; small open models; DROID-100 is likely in Ctrl-World's training
+data (a best case); arm and object motion break rigidity even in real clips; VGGT scores reflect
+VGGT's own predictions, and paths are compared to a VGGT estimate up to scale.
 
 \bibliography{refs}
 
@@ -265,6 +260,42 @@ follows the real camera's sweep. Wan2.2 and CogVideoX hold the viewpoint while o
 LTX distorts the scene.}
 \label{fig:qual2}
 \end{figure}
+
+\section{Calibration ladder}
+\label{app:calib}
+\begin{table}[h]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\input{tab_calib}
+\vspace{4pt}
+\caption{Calibration ladder at the main settings (5\,fps, 0.4\,s pairs, the 25 shared clips). ``--'':
+too few frames register.}
+\label{tab:calib}
+\end{table}
+
+\section{Robustness of the motion-matched comparison}
+\label{app:robust}
+\begin{table}[h]
+\centering
+\scriptsize
+\input{tab_robust}
+\vspace{4pt}
+\caption{VGGT depth disagreement, model $-$ real continuation $\to$ model $-$ motion-matched real
+footage, on the same matched clips, at three frame-pair gaps and with two matching estimators (25
+shared clips). $^*$: 95\% bootstrap CI excludes zero.}
+\label{tab:robust}
+\end{table}
+\textbf{Matching.} Median relative matching error on matched clips is 1--4\% for every model and
+estimator. Matches exist for 15--18 of 25 LTX clips, 22--23 Ctrl-World clips, and 6--9 CogVideoX and
+Wan2.2 clips: real wrist footage rarely moves as little as the near-static models' outputs.
+
+\textbf{All 60 clips (LTX, Ctrl-World).} At 0.4\,s with SIFT matching, LTX (39 matched clips) has VGGT
+differences of +0.003 (raw) and +0.005 (matched), and match-failure differences of +0.24 and +0.27.
+Ctrl-World (52 matched clips) has VGGT differences of +0.002 and +0.002 (dense matching: +0.000 and
++0.004), and match-failure differences of +0.21 and +0.23. The VGGT CIs include zero, while every
+match-failure CI excludes zero. The direction of the shared-clip results holds, but the VGGT deficit
+of Ctrl-World against matched footage is not significant on the larger set.
 
 \textbf{Code.} All code will be released after review.
 
