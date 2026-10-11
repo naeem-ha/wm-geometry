@@ -74,6 +74,34 @@ def compare(r, clips, model, est, gap):
     return {k: boot(raw_acc[k]) for k in raw_acc}, {k: boot(mat[k]) for k in mat}, len(errs), n_all, (float(np.median(errs)) if errs else np.nan)
 
 
+def detail(r, clips, model, est, gap, only_slowed=False):
+    """raw, matched and shift = (model - real) - (model - matched) = matched - real, per clip.
+    The shift's CI tests directly whether matching changes the comparison."""
+    out = {k: {"raw": [], "matched": [], "shift": []} for k, *_ in METRICS}
+    n_slow = n_win = 0
+    for c in clips:
+        key = f"{model}/{c}"
+        mm = r["matched"].get(f"{key}/{est}")
+        if key not in r["model"] or not (mm and mm["accepted"]):
+            continue
+        slowed = mm["candidate"].startswith("slow")
+        if only_slowed and not slowed:
+            continue
+        n_slow += slowed
+        n_win += not slowed
+        g, real, ctl = flat(r["model"][key], gap), flat(r["real"][c], gap), flat(mm["scores"], gap)
+        for k, *_ in METRICS:
+            out[k]["raw"].append(g[k] - real[k])
+            out[k]["matched"].append(g[k] - ctl[k])
+            out[k]["shift"].append(ctl[k] - real[k])
+    return {k: {t: boot(v) for t, v in d.items()} for k, d in out.items()}, n_slow, n_win
+
+
+def ci(v):
+    m, lo, hi, _ = v
+    return "--" if np.isnan(m) else f"{fmt(m)} [{fmt(lo)}, {fmt(hi)}]"
+
+
 def main():
     r = json.loads((W / "matched.json").read_text())
     r.setdefault("real", {})
@@ -126,6 +154,28 @@ def main():
             L.append(f"{label if est == 'sift' else ''} & {elab} ($n$={out[f'{model}/common/{est}/2']['n_ok']}) & " + " & ".join(cells) + " \\\\")
     L += ["\\bottomrule", "\\end{tabular}"]
     (ROOT / "paper/tab_robust.tex").write_text("\n".join(L), encoding="utf-8")
+
+    # full intervals: raw, matched and the shift between them, all matched controls and slowed-only
+    L = ["\\begin{tabular}{lllccc}", "\\toprule",
+         "Model & Matching & Controls & VGGT: raw & VGGT: matched & VGGT: shift \\\\", "\\midrule"]
+    out["detail"] = {}
+    for model, label in MODELS:
+        first = True
+        for est, elab in (("motion_sift", "SIFT"), ("motion_dense", "dense")):
+            for only in (False, True):
+                d, ns, nw = detail(r, common, model, est, 2, only)
+                out["detail"][f"{model}/{est}/{'slowed' if only else 'all'}"] = {"n_slow": ns, "n_win": nw, **d}
+                ctrl = f"slowed only ({ns})" if only else f"all ({ns}+{nw})"
+                L.append(f"{label if first else ''} & {elab if not only else ''} & {ctrl} & "
+                         + " & ".join(ci(d['vggt'][t]) for t in ('raw', 'matched', 'shift')) + " \\\\")
+                first = False
+    L += ["\\bottomrule", "\\end{tabular}"]
+    (ROOT / "paper/tab_ci.tex").write_text("\n".join(L), encoding="utf-8")
+    (W / "matched_numbers.json").write_text(json.dumps(out, indent=1))
+    for k, v in out["detail"].items():
+        print(k, f"slowed={v['n_slow']} windows={v['n_win']}",
+              "VGGT raw", ci(v["vggt"]["raw"]), "matched", ci(v["vggt"]["matched"]), "shift", ci(v["vggt"]["shift"]),
+              "| Fail shift", ci(v["fail"]["shift"]))
 
     def show(k):
         v = out[k]
