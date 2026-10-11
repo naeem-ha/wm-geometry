@@ -176,8 +176,8 @@ footage with the same image motion, CogVideoX's VGGT advantage shrinks by about 
 $-$0.011) but remains significant, and Wan2.2's disappears ($-$0.010 to +0.005). The same holds at the
 other gaps and with dense-flow matching (Table~\ref{tab:robust}). LTX's significant VGGT advantage at
 0.8\,s ($-$0.019, dense matching) vanishes against matched footage, and its match-failure gap widens
-(+0.32 to +0.38). The shift itself, matched reference minus real continuation per clip, is
-significant for CogVideoX ($-$0.028 [$-$0.049, $-$0.006], SIFT), Ctrl-World ($-$0.008 [$-$0.014,
+(+0.32 to +0.38). The shift, raw minus matched (equal to matched reference minus real
+continuation), is significant for CogVideoX ($-$0.028 [$-$0.049, $-$0.006], SIFT), Ctrl-World ($-$0.008 [$-$0.014,
 $-$0.003], SIFT) and LTX ($-$0.012 [$-$0.023, $-$0.003], dense), but not for Wan2.2. Only 6--9 of 25
 clips could be matched for the near-static models, so per-model estimates are exploratory
 (intervals in Appendix~\ref{app:robust}). Most matched references are other windows of the episode
@@ -307,7 +307,8 @@ the full analysis.
 \vspace{4pt}
 \caption{VGGT depth disagreement at 0.4\,s on the 25 shared clips, mean [95\% bootstrap CI]. Raw:
 model $-$ real continuation. Matched: model $-$ motion-matched reference. Shift: matched reference
-$-$ real continuation, which equals the change between the two comparisons. Controls: number of slowed
+$-$ real continuation, which equals raw $-$ matched. A negative shift means the model looks worse
+against the motion-matched reference than against the real continuation. Controls: number of slowed
 continuations + other episode windows. ``--'': fewer than three clips.}
 \label{tab:ci}
 \end{table}
