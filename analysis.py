@@ -18,21 +18,21 @@ ROOT = Path(__file__).resolve().parent
 W = ROOT / "work"
 H = "5"
 LABEL = {
-    "ctrl_real": "Real (re-encoded)", "ctrl_slow2.5": "Real, slowed 2.5$\\times$",
-    "ctrl_blur0.7": "Real, blurred", "ctrl_warp1": "Real, warp 1\\,px", "ctrl_warp2": "Real, warp 2\\,px",
-    "ctrl_warp4": "Real, warp 4\\,px", "ctrl_warp8": "Real, warp 8\\,px", "ctrl_mix": "Unrelated frames",
-    "gen_ltx": "LTX-Video", "gen_cogvideox_5b": "CogVideoX-5B", "gen_wan22_5b": "Wan2.2-5B",
+    "ctrl_real": "Real", "ctrl_slow2.5": "Slowed 2.5$\\times$",
+    "ctrl_blur0.7": "Blurred", "ctrl_warp1": "Warp 1\\,px", "ctrl_warp2": "Warp 2\\,px",
+    "ctrl_warp4": "Warp 4\\,px", "ctrl_warp8": "Warp 8\\,px", "ctrl_mix": "Unrelated",
+    "gen_ltx": "LTX", "gen_cogvideox_5b": "CogVideoX", "gen_wan22_5b": "Wan2.2",
     "gen_ctrlworld": "Ctrl-World",
 }
 MAIN_ROWS = ["ctrl_real", "ctrl_slow2.5", "ctrl_blur0.7", "ctrl_warp8", "ctrl_mix",
              "gen_ltx", "gen_cogvideox_5b", "gen_wan22_5b", "gen_ctrlworld"]
 CALIB_ROWS = ["ctrl_real", "ctrl_warp1", "ctrl_warp2", "ctrl_warp4", "ctrl_warp8", "ctrl_mix"]
 # model vs the control that matches it on the relevant nuisance factor
-PAIRS = [("gen_ltx", "ctrl_slow2.5", "LTX $-$ slowed real (matched motion)"),
+PAIRS = [("gen_ltx", "ctrl_slow2.5", "LTX $-$ slowed"),
          ("gen_cogvideox_5b", "ctrl_real", "CogVideoX $-$ real"),
          ("gen_wan22_5b", "ctrl_real", "Wan2.2 $-$ real"),
          ("gen_ctrlworld", "ctrl_real", "Ctrl-World $-$ real"),
-         ("gen_ctrlworld", "ctrl_blur0.7", "Ctrl-World $-$ blurred real (matched sharpness)")]
+         ("gen_ctrlworld", "ctrl_blur0.7", "Ctrl-World $-$ blurred")]
 
 
 def load():
@@ -90,18 +90,15 @@ def main():
             "path_other_clip_p10": float(np.percentile(other, 10))}
 
     # main table
-    cols = [("motion", "Motion (px)"), ("reg", "Registered"), ("fail", "Match fail"), ("inliers", "Inliers"),
-            ("sampson", "Sampson (px)"), ("vggt", "VGGT depth err."), ("cov", "Coverage"), ("path", "Path err.")]
+    cols = [("motion", "Motion"), ("reg", "Reg."), ("fail", "Fail"), ("inliers", "Inliers"),
+            ("sampson", "Sampson"), ("vggt", "VGGT"), ("cov", "Cov."), ("path", "Path")]
     L = ["\\begin{tabular}{l" + "c" * len(cols) + "}", "\\toprule", " & " + " & ".join(c[1] for c in cols) + " \\\\", "\\midrule"]
     for i, cond in enumerate(MAIN_ROWS):
         if cond == "gen_ltx":
             L.append("\\midrule")
         g = d[d.cond == cond]
         L.append(LABEL[cond] + " & " + " & ".join(cell(g, c) for c, _ in cols) + " \\\\")
-    L.append("\\midrule")
-    L.append("\\multicolumn{" + str(len(cols)) + "}{l}{\\emph{Path-error references:} frozen camera "
-             + fmt(frozen.mean()) + "; real path of a different clip " + fmt(other.mean()) + "} & \\\\")
-    L += ["\\bottomrule", "\\end{tabular}"]
+    L += ["\\bottomrule", "\\end{tabular}"]  # path-error references are given in the caption
     (ROOT / "paper/tab_main.tex").write_text("\n".join(L), encoding="utf-8")
 
     # calibration table on the same clips and settings
@@ -121,7 +118,7 @@ def main():
     (ROOT / "paper/tab_calib.tex").write_text("\n".join(L), encoding="utf-8")
 
     # paired differences with bootstrap CIs
-    dcols = [("reg", "Registered"), ("fail", "Match fail"), ("vggt", "VGGT err."), ("vggt_f", "VGGT err.\\ (filtered)"), ("path", "Path err.")]
+    dcols = [("reg", "Reg."), ("fail", "Fail"), ("vggt", "VGGT"), ("vggt_f", "VGGT (filt.)"), ("path", "Path")]
     L = ["\\begin{tabular}{l" + "c" * len(dcols) + "}", "\\toprule", " & " + " & ".join(c[1] for c in dcols) + " \\\\", "\\midrule"]
     nums["diffs"] = {}
     for a, b, lab in PAIRS:
