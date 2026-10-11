@@ -136,6 +136,16 @@ def main():
     L += ["\\bottomrule", "\\end{tabular}"]
     (ROOT / "paper/tab_diff.tex").write_text("\n".join(L), encoding="utf-8")
 
+    # path error against each clip's own unrelated-path baseline (mean over all other clips' real paths)
+    ref = {c: np.array(v) for c, v in sens["_real_centers"].items()}
+    base = pd.Series({k: np.mean([vggt_eval.ate_sim3(ref[o], ref[k]) for o in clips if o != k]) for k in clips})
+    nums["path_vs_unrelated"] = {}
+    for cond in ["ctrl_real", "ctrl_slow2.5", "gen_ltx", "gen_cogvideox_5b", "gen_wan22_5b", "gen_ctrlworld"]:
+        p = d[d.cond == cond].set_index("clip")["path"]
+        m, lo, hi, n = boot_ci(p, base)
+        nums["path_vs_unrelated"][cond] = [m, lo, hi, n, float((p - base).lt(0).mean())]
+        print(f"path - unrelated baseline {cond:18s} {m:+.3f} [{lo:+.3f}, {hi:+.3f}] better on {(p - base).lt(0).mean():.0%}")
+
     summ = d.groupby("cond")[["motion", "reg", "reproj", "fail", "inliers", "sampson", "vggt", "vggt_f", "cov", "cov_f", "path"]]
     nums["mean"] = summ.mean().round(4).to_dict(orient="index")
     nums["count"] = summ.count().to_dict(orient="index")
