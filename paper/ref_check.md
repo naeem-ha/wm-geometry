@@ -25,9 +25,9 @@
 | motamed2025physicsiq | OK | arXiv page 200; title match; 1st author match; arXiv 2025 / bib 2025 | arXiv preprint arXiv:2501.09038 |
 | nvidia2025cosmos | OK | arXiv page 200; title match; 1st author match; arXiv 2025 / bib 2025 | arXiv preprint arXiv:2501.03575 |
 | quevedo2025worldgym | OK | arXiv page 200; title match; 1st author match; arXiv 2025 / bib 2025 | arXiv preprint arXiv:2506.00613 |
-| schonberger2016sfm | OK | Crossref DOI title match; S2 venue: Computer Vision and Pattern Recognition 2016 | Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) |
+| schonberger2016sfm | OK | Crossref DOI title match; S2 lookup 0 | Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) |
 | wan2025wan | OK | arXiv page 200; title match; 1st author match; arXiv 2025 / bib 2025 | arXiv preprint arXiv:2503.20314 |
-| wang2024dust3r | OK | arXiv page 200; title match; 1st author match; arXiv 2023 / bib 2024; S2 venue: Computer Vision and Pattern Recognition 2023 | Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) |
+| wang2024dust3r | OK | arXiv page 200; title match; 1st author match; arXiv 2023 / bib 2024; S2 lookup 0 | Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) |
 | wang2025vggt | OK | arXiv page 200; title match; 1st author match; arXiv 2025 / bib 2025; S2 venue: Computer Vision and Pattern Recognition 2025 | Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) |
 | wang2026robophys3d | OK | arXiv page 200; title match; 1st author match; arXiv 2026 / bib 2026 | arXiv preprint arXiv:2608.28718 |
 | xu2024camco | OK | arXiv page 200; title match; 1st author match; arXiv 2024 / bib 2024 | arXiv preprint arXiv:2406.02509 |
