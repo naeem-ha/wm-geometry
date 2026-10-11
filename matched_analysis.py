@@ -54,6 +54,7 @@ def cell(m, lo, hi):
 
 def compare(r, clips, model, est, gap):
     raw, mat, errs, n_all = {k: [] for k, *_ in METRICS}, {k: [] for k, *_ in METRICS}, [], 0
+    raw_acc = {k: [] for k, *_ in METRICS}
     for c in clips:
         key = f"{model}/{c}"
         if key not in r["model"]:
@@ -68,7 +69,9 @@ def compare(r, clips, model, est, gap):
             ctl = flat(mm["scores"], gap)
             for k, *_ in METRICS:
                 mat[k].append(g[k] - ctl[k])
-    return {k: boot(raw[k]) for k in raw}, {k: boot(mat[k]) for k in mat}, len(errs), n_all, (float(np.median(errs)) if errs else np.nan)
+                raw_acc[k].append(g[k] - real[k])
+    # raw is reported on the same accepted clips as matched, so a sign change is a like-for-like reversal
+    return {k: boot(raw_acc[k]) for k in raw_acc}, {k: boot(mat[k]) for k in mat}, len(errs), n_all, (float(np.median(errs)) if errs else np.nan)
 
 
 def main():
@@ -86,7 +89,7 @@ def main():
     for model, label in MODELS:
         raw, mat, n_ok, n_all, err = compare(r, common, model, "motion_sift", 2)
         out[f"{model}/common/sift/2"] = {"raw": raw, "matched": mat, "n_ok": n_ok, "n_all": n_all, "med_rel_err": err}
-        lines.append(f"{label} & real & " + " & ".join(cell(*raw[k][:3]) for k, *_ in METRICS) + f" & {n_all} \\\\")
+        lines.append(f"{label} & real & " + " & ".join(cell(*raw[k][:3]) for k, *_ in METRICS) + f" & {n_ok} \\\\")
         lines.append(f" & matched & " + " & ".join(cell(*mat[k][:3]) for k, *_ in METRICS) + f" & {n_ok} \\\\")
     fz = {k: [] for k, *_ in METRICS}
     for c in common:
@@ -111,6 +114,18 @@ def main():
                     out[f"{model}/{name}/{est.split('_')[1]}/{gap}"] = {"raw": raw, "matched": mat, "n_ok": n_ok,
                                                                       "n_all": n_all, "med_rel_err": err}
     (W / "matched_numbers.json").write_text(json.dumps(out, indent=1))
+
+    # robustness table: VGGT raw -> matched across gaps and both motion estimators (common clips)
+    L = ["\\begin{tabular}{llccc}", "\\toprule", "Model & Matching & 0.2\\,s & 0.4\\,s & 0.8\\,s \\\\", "\\midrule"]
+    for model, label in MODELS:
+        for est, elab in (("sift", "SIFT"), ("dense", "dense flow")):
+            cells = []
+            for g in (1, 2, 4):
+                v = out[f"{model}/common/{est}/{g}"]
+                cells.append(f"{cell(*v['raw']['vggt'][:3])} $\\to$ {cell(*v['matched']['vggt'][:3])}")
+            L.append(f"{label if est == 'sift' else ''} & {elab} ($n$={out[f'{model}/common/{est}/2']['n_ok']}) & " + " & ".join(cells) + " \\\\")
+    L += ["\\bottomrule", "\\end{tabular}"]
+    (ROOT / "paper/tab_robust.tex").write_text("\n".join(L), encoding="utf-8")
 
     def show(k):
         v = out[k]
