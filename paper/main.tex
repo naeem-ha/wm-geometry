@@ -1,15 +1,22 @@
-% CoRL 2026 workshop "Do Robots Need World Models?": CoRL template, 4 pages excluding references
-% and appendices, double-blind. The submission option anonymizes the author block automatically.
+% CoRL 2026 workshop "Do Robots Need World Models?": CoRL template, 4 pages excluding limitations,
+% AI usage statement, acknowledgments, references and appendix. Camera-ready (final option).
 % All numbers come from ../analysis.py (tab_main.tex, tab_calib.tex, tab_diff.tex, work/numbers.json).
 \documentclass{article}
-\usepackage{corl_2026}
+\usepackage[final]{corl_2026}
 \usepackage{amsmath,amssymb,booktabs,graphicx}
+% The final option labels the paper as a main-conference paper; this is a workshop paper.
+\makeatletter
+\renewcommand{\@noticestring}{CoRL 2026 Workshop: Do Robots Need World Models?, Austin TX, USA.}
+\makeatother
+\hypersetup{pdftitle={Pixels Without Geometry? Auditing the 3D Consistency of Video World Models with Structure-from-Motion},
+  pdfauthor={Hamza Naeem}, pdfsubject={CoRL 2026 Workshop: Do Robots Need World Models?}}
 
 \title{Pixels Without Geometry? Auditing the 3D Consistency of Video World Models with Structure-from-Motion}
 
 \author{
   Hamza Naeem\\
-  \texttt{hamzanaeem588@gmail.com}
+  Northeastern University\\
+  \texttt{naeem.ha@northeastern.edu}
 }
 
 \begin{document}
@@ -210,7 +217,13 @@ as one number. We do not claim that action conditioning causes Ctrl-World's beha
 differs in inputs, architecture and training data. Nor do we claim that these scores predict
 planning success. \textbf{Limitations:} one dataset and camera at low resolution; 25 shared clips,
 few matchable for near-static models; small open models; DROID-100 likely in Ctrl-World's training
-data; arm and object motion break rigidity; VGGT scores reflect its own predictions.
+data; arm and object motion break rigidity; VGGT scores reflect its own predictions (a second
+scorer, StreamVGGT, agrees closely; Appendix~\ref{app:stream}).
+
+\textbf{AI usage statement.} An AI coding assistant (Claude, Anthropic) was used to write and debug
+the experiment and analysis code, search for and verify references, and draft and edit text, under
+the author's direction. The author designed the study, checked the results and the final text, and
+takes full responsibility for the paper.
 
 \bibliography{refs}
 
@@ -320,6 +333,20 @@ Ctrl-World (52 matched clips) has VGGT differences of +0.002 and +0.002 (dense m
 match-failure CI excludes zero. The direction of the shared-clip results holds, but the VGGT deficit
 of Ctrl-World against matched footage is not significant on the larger set.
 
-\textbf{Code.} All code will be released after review.
+\section{A second geometry scorer}
+\label{app:stream}
+VGGT disagreement measures the consistency of one network's predictions. As a check, we re-scored the
+25 shared clips (real, frozen and the four models; default variant, 0.4\,s gap) with
+StreamVGGT~\citep{zhuo2025streamvggt}, a causal streaming variant of VGGT in which each frame attends
+only to earlier frames. StreamVGGT's disagreement is higher overall (real footage: median 0.037 vs.\
+0.023), but the two scorers agree closely: Spearman $\rho=0.86$ over the 150 clip--condition pairs and
+0.94 over the six condition medians. The frozen frame scores lower than real footage on 25 of 25 clips
+under both. Against the real continuation, CogVideoX and Wan2.2 score lower under both scorers
+(Wilcoxon $p<0.001$ and $p\le0.03$), and Ctrl-World shows no detectable difference under either
+($p=0.67$, $0.83$). LTX differs: it is not distinguishable from real footage under VGGT ($p=0.31$) but
+scores lower under StreamVGGT (68\% of clips, $p=0.03$). Raw comparisons can therefore depend on the
+choice of scorer, which strengthens the case for the matched references.
+
+\textbf{Code.} Code is available at \url{https://github.com/naeem-ha/wm-geometry}.
 
 \end{document}
