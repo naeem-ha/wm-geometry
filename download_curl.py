@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parent / "models"
 DIFFUSERS = ["model_index.json", "scheduler/*", "tokenizer/*", "vae/*", "transformer/*"]
 QUEUE = {
     "vggt": ("facebook/VGGT-1B", ["config.json", "model.safetensors"]),
+    # StreamVGGT (ICLR 2026, Wenzhao Zheng et al.): causal streaming variant of VGGT, a second scorer
+    "streamvggt": ("lch01/StreamVGGT", ["config.json", "model.safetensors"]),
     "t5": ("zai-org/CogVideoX-5b-I2V", ["text_encoder/*"]),  # shared by CogVideoX and LTX
     "ltx": ("Lightricks/LTX-Video", DIFFUSERS),
     "cogvideox_5b": ("zai-org/CogVideoX-5b-I2V", DIFFUSERS),
