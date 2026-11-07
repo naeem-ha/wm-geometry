@@ -64,7 +64,9 @@ Classical geometry has been applied to generated video before: Li et al.~\citep{
 SIFT/RANSAC epipolar consistency and COLMAP reconstructions on a handful of Sora, Gen-2 and Pika
 clips, and MEt3R~\citep{asim2025met3r}, WorldScore~\citep{duan2025worldscore} and
 GeoT2V-Bench~\citep{fan2026geot2v} score 3D consistency with feed-forward
-reconstructors~\citep{wang2024dust3r,leroy2024mast3r,wang2025vggt}. Camera-controllable
+reconstructors~\citep{wang2024dust3r,leroy2024mast3r,wang2025vggt}. Reporting motion next to
+consistency is established: VBench~\citep{huang2024vbench} pairs a dynamic-degree score with its
+consistency scores for this reason. Camera-controllable
 generators report pose error and COLMAP success rates~\citep{he2024cameractrl,xu2024camco,bahmani2025ac3d},
 and broader benchmarks probe plausibility~\citep{huang2024vbench,li2025worldmodelbench,motamed2025physicsiq}. Several of the
 confounds we study have been observed before. MEt3R~\citep{asim2025met3r} notes that shorter camera
@@ -213,10 +215,16 @@ shrink or remove the advantages of near-static predictions and can reveal defici
 comparison hides. We propose a simple protocol: report image
 motion (with two estimators) and match coverage, compare each clip against a frozen frame and
 against motion- and appearance-matched real references, and report the scores separately rather than
-as one number. We do not claim that action conditioning causes Ctrl-World's behavior, because it also
+as one number. Matched references add something that two side-by-side scores do not: they compare a
+prediction with real footage at the \emph{same} motion level, showing that CogVideoX's VGGT
+advantage shrinks by 70\%. They need no extra generation, only scoring of existing real footage.
+
+\textbf{Limitations.} We do not claim that action conditioning causes Ctrl-World's behavior, because it also
 differs in inputs, architecture and training data. Nor do we claim that these scores predict
-planning success. \textbf{Limitations:} one dataset and camera at low resolution; 25 shared clips,
-few matchable for near-static models; small open models; DROID-100 likely in Ctrl-World's training
+planning success. Further limitations: one dataset and camera at low resolution, so the findings need testing on
+other datasets and more clips; 25 shared clips, only 6--9 matchable for the near-static models, so
+claims about CogVideoX and Wan2.2 rest on few clips; matched references are mostly other windows of
+the episode and can differ in viewpoint and objects as well as motion; small open models; DROID-100 likely in Ctrl-World's training
 data; arm and object motion break rigidity; VGGT scores reflect its own predictions (a second
 scorer, StreamVGGT, agrees closely; Appendix~\ref{app:stream}).
 
